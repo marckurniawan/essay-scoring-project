@@ -1,0 +1,26 @@
+.env
+# Python cache and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python environments
+.venv/
+venv/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Frontend dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
