@@ -32,6 +32,24 @@ export type ExamCreateInput = {
   criteria: CriterionInput[];
 };
 
+export type CriterionGrade = {
+  criterion_id: number;
+  label: string;
+  score: number;
+  reasoning: string;
+  satisfied: boolean;
+  weight: number;
+  included_in_final_score: boolean;
+};
+
+export type GradingResult = {
+  submission_id: number;
+  exam_id: number;
+  final_score: number;
+  created_at: string | null;
+  criterion_results: CriterionGrade[];
+};
+
 type ApiErrorBody = {
   detail?: string | { msg?: string }[];
 };
@@ -90,6 +108,21 @@ export function updateCriterionWeight(
     {
       method: "PATCH",
       body: JSON.stringify({ weight }),
+    },
+  );
+}
+
+export function gradeSubmission(
+  examId: number,
+  studentAnswer: string,
+): Promise<GradingResult> {
+  return request<GradingResult>(
+    `/api/exams/${examId}/submissions`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        student_answer: studentAnswer,
+      }),
     },
   );
 }
