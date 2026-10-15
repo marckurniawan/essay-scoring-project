@@ -1,19 +1,53 @@
-
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Criterion, Exam
+from app.models import Criterion, Exam, ExamQuestion, User
 from app.schemas import (
-    CriterionCreate,
     CriterionResponse,
     CriterionUpdate,
     ExamCreate,
+    ExamQuestionResponse,
+    ExamQuestionUpdate,
     ExamResponse,
     ExamUpdate,
 )
+from app.security import get_current_user, require_role
+
 
 router = APIRouter(prefix="/api/exams", tags=["Exams"])
+
+
+def _create_question(
+    db: Session,
+    exam: Exam,
+    question_text: str,
+    question_weight: float,
+    position: int,
+    criterion_items,
+) -> ExamQuestion:
+    question = ExamQuestion(
+        exam_id=exam.id,
+        question=question_text,
+        weight=question_weight,
+        position=position,
+    )
+    db.add(question)
+    db.flush()
+
+    for item in criterion_items:
+        db.add(
+            Criterion(
+                exam_id=exam.id,
+                question_id=question.id,
+                label=item.label,
+                description=item.description,
+                weight=item.weight,
+                max_score=item.max_score,
+            )
+        )
+
+    return question
 
 
 @router.post(
@@ -21,44 +55,67 @@ router = APIRouter(prefix="/api/exams", tags=["Exams"])
     response_model=ExamResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def create_exam(payload: ExamCreate, db: Session = Depends(get_db)):
+def create_exam(
+    payload: ExamCreate,
+    db: Session = Depends(get_db),
+    _teacher: User = Depends(require_role("teacher")),
+):
+    if payload.questions is not None:
+        question_definitions = [
+            (item.question, item.weight, item.criteria)
+            for item in payload.questions
+        ]
+    else:
+        # Legacy clients still create one question and top-level criteria.
+        question_definitions = [(payload.question, 100, payload.criteria)]
+
+    first_question_text = question_definitions[0][0]
     exam = Exam(
         title=payload.title,
-        question=payload.question,
+        question=first_question_text,
+        duration_minutes=payload.duration_minutes,
     )
-
-    exam.criteria = [
-        Criterion(
-            label=item.label,
-            description=item.description,
-            weight=item.weight,
-            max_score=item.max_score,
-        )
-        for item in payload.criteria
-    ]
-
     db.add(exam)
-    db.commit()
-    db.refresh(exam)
+    db.flush()
 
-    return exam
+    for position, (question_text, question_weight, criterion_items) in enumerate(
+        question_definitions
+    ):
+        _create_question(
+            db=db,
+            exam=exam,
+            question_text=question_text,
+            question_weight=question_weight,
+            position=position,
+            criterion_items=criterion_items,
+        )
+
+    db.commit()
+
+    # Reload to ensure the response contains all newly associated relationships.
+    return db.query(Exam).filter(Exam.id == exam.id).first()
 
 
 @router.get("", response_model=list[ExamResponse])
-def list_exams(db: Session = Depends(get_db)):
+def list_exams(
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
     return db.query(Exam).order_by(Exam.id.desc()).all()
 
 
 @router.get("/{exam_id}", response_model=ExamResponse)
-def get_exam(exam_id: int, db: Session = Depends(get_db)):
+def get_exam(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
-
     if exam is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Exam not found",
         )
-
     return exam
 
 
@@ -67,9 +124,9 @@ def update_exam(
     exam_id: int,
     payload: ExamUpdate,
     db: Session = Depends(get_db),
+    _teacher: User = Depends(require_role("teacher")),
 ):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
-
     if exam is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -77,26 +134,78 @@ def update_exam(
         )
 
     updates = payload.model_dump(exclude_unset=True)
-
-    if not updates:
+    if not updates or any(value is None for value in updates.values()):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Provide at least one field to update",
-        )
-
-    if any(value is None for value in updates.values()):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Fields cannot be null",
+            detail="Provide valid fields to update",
         )
 
     for field, value in updates.items():
         setattr(exam, field, value)
 
-    db.commit()
-    db.refresh(exam)
+    if "question" in updates:
+        first_question = (
+            db.query(ExamQuestion)
+            .filter(ExamQuestion.exam_id == exam.id)
+            .order_by(ExamQuestion.position, ExamQuestion.id)
+            .first()
+        )
+        if first_question is not None:
+            first_question.question = updates["question"]
 
-    return exam
+    db.commit()
+    return db.query(Exam).filter(Exam.id == exam.id).first()
+
+
+@router.patch(
+    "/{exam_id}/questions/{question_id}",
+    response_model=ExamQuestionResponse,
+)
+def update_exam_question(
+    exam_id: int,
+    question_id: int,
+    payload: ExamQuestionUpdate,
+    db: Session = Depends(get_db),
+    _teacher: User = Depends(require_role("teacher")),
+):
+    question = (
+        db.query(ExamQuestion)
+        .filter(
+            ExamQuestion.id == question_id,
+            ExamQuestion.exam_id == exam_id,
+        )
+        .first()
+    )
+    if question is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Question not found for this exam",
+        )
+
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates or any(value is None for value in updates.values()):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Provide valid fields to update",
+        )
+
+    for field, value in updates.items():
+        setattr(question, field, value)
+
+    # Preserve the legacy Exam.question field for the first question.
+    first_question = (
+        db.query(ExamQuestion)
+        .filter(ExamQuestion.exam_id == exam_id)
+        .order_by(ExamQuestion.position, ExamQuestion.id)
+        .first()
+    )
+    if first_question is not None and first_question.id == question.id:
+        exam = db.query(Exam).filter(Exam.id == exam_id).first()
+        exam.question = question.question
+
+    db.commit()
+    db.refresh(question)
+    return question
 
 
 @router.patch(
@@ -108,6 +217,7 @@ def update_criterion(
     criterion_id: int,
     payload: CriterionUpdate,
     db: Session = Depends(get_db),
+    _teacher: User = Depends(require_role("teacher")),
 ):
     criterion = (
         db.query(Criterion)
@@ -117,7 +227,6 @@ def update_criterion(
         )
         .first()
     )
-
     if criterion is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -125,17 +234,10 @@ def update_criterion(
         )
 
     updates = payload.model_dump(exclude_unset=True)
-
-    if not updates:
+    if not updates or any(value is None for value in updates.values()):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Provide at least one field to update",
-        )
-
-    if any(value is None for value in updates.values()):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Fields cannot be null",
+            detail="Provide valid fields to update",
         )
 
     for field, value in updates.items():
@@ -143,14 +245,19 @@ def update_criterion(
 
     db.commit()
     db.refresh(criterion)
-
     return criterion
 
 
-@router.delete("/{exam_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_exam(exam_id: int, db: Session = Depends(get_db)):
+@router.delete(
+    "/{exam_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_exam(
+    exam_id: int,
+    db: Session = Depends(get_db),
+    _teacher: User = Depends(require_role("teacher")),
+):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
-
     if exam is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -159,5 +266,4 @@ def delete_exam(exam_id: int, db: Session = Depends(get_db)):
 
     db.delete(exam)
     db.commit()
-
     return Response(status_code=status.HTTP_204_NO_CONTENT)
