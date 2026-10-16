@@ -11,6 +11,8 @@ EssAI is a web platform that lets teachers build essay exams with weighted rubri
 ## Features
 
 - **Teacher dashboard** — create exams with one or more questions, each with its own weight and rubric criteria; adjust question/criterion weights after creation.
+- **Class management** — teachers can create classes, share invitation codes, assign exams, review student performance, and see class-level score summaries.
+- **Student registration** — students can sign up with a class invitation code; the backend assigns the student role automatically.
 - **Student exam flow** — timed attempts with server-side deadlines, answer autosave per question, and automatic submission when time runs out.
 - **AI grading** — answers are graded against the rubric by Gemini, with automatic fallback across multiple models if one fails or is rate-limited.
 - **Score history** — students can see a summary of all their results and drill into every attempt, including per-criterion feedback.
@@ -23,7 +25,7 @@ EssAI is a web platform that lets teachers build essay exams with weighted rubri
 |----------|------------|
 | Frontend | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4 |
 | Backend  | FastAPI, SQLAlchemy, Pydantic v2, PyJWT, pwdlib (Argon2) |
-| Database | SQLite (file-based, via SQLAlchemy) |
+| Database | SQLite locally and PostgreSQL for deployment (via SQLAlchemy) |
 | AI       | Google Gemini (`google-genai`) |
 
 ## Project structure
@@ -32,13 +34,14 @@ EssAI is a web platform that lets teachers build essay exams with weighted rubri
 essay-scoring-project/
 ├── backend/
 │   ├── app/
-│   │   ├── routers/        # auth, exams, grading, history, protests
+│   │   ├── routers/        # auth, classes, exams, grading, history, protests
 │   │   ├── services/       # llm_grader.py (Gemini), scoring.py (weighted score)
 │   │   ├── models.py       # SQLAlchemy models
 │   │   ├── schemas.py      # Pydantic request/response models
 │   │   ├── security.py     # password hashing, JWT session cookies
 │   │   ├── database.py     # SQLAlchemy engine/session
-│   │   ├── seed_users.py   # creates the demo teacher/student accounts
+│   │   ├── seed_users.py   # creates demo accounts and the demo class
+│   │   ├── migrate_sqlite_to_postgres.py # one-time initial data migration
 │   │   └── main.py         # FastAPI app entrypoint
 │   ├── tests/               # pytest test suite
 │   ├── requirements.txt
@@ -89,6 +92,11 @@ DEMO_TEACHER_PASSWORD=choose_a_password_12_chars_min
 DEMO_STUDENT_NAME=Demo Student
 DEMO_STUDENT_EMAIL=student@example.com
 DEMO_STUDENT_PASSWORD=choose_a_password_12_chars_min
+DEMO_CLASS_NAME=Kelas Demo EssAI
+
+# Kosong saat lokal berarti memakai SQLite.
+DATABASE_URL=
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
 | Variable | Required | Default | Purpose |
@@ -99,7 +107,10 @@ DEMO_STUDENT_PASSWORD=choose_a_password_12_chars_min
 | `APP_SECRET_KEY` | Yes | — | Signs the session cookie; must be a long random string, rotating it invalidates all sessions. |
 | `APP_COOKIE_SECURE` | No | `false` | Set to `true` once the app is served over HTTPS, so the session cookie requires it. |
 | `DEMO_TEACHER_NAME` / `DEMO_TEACHER_EMAIL` / `DEMO_TEACHER_PASSWORD` | Yes (for seeding) | — | Used once by `seed_users.py` to create the demo teacher account. Password must be ≥ 12 characters. |
-| `DEMO_STUDENT_NAME` / `DEMO_STUDENT_EMAIL` / `DEMO_STUDENT_PASSWORD` | Yes (for seeding) | — | Used once by `seed_users.py` to create the demo student account. Password must be ≥ 12 characters. |
+| `DEMO_STUDENT_NAME` / `DEMO_STUDENT_EMAIL` / `DEMO_STUDENT_PASSWORD` | Yes (for seeding) | — | Used by `seed_users.py` to create the demo student account. Password must be ≥ 12 characters. |
+| `DEMO_CLASS_NAME` | No | `Kelas Demo EssAI` | The demo class created for the teacher; the code is shown by the seeding command and in Manage Classes. |
+| `DATABASE_URL` | No for local; yes for PostgreSQL hosting | SQLite locally | SQLAlchemy database connection. Leave empty locally to use SQLite; set to a PostgreSQL URL in production. |
+| `CORS_ORIGINS` | No | Local frontend origins | Comma-separated allowed origins for separate frontend/backend deployments. Same-origin Vercel rewrites do not require extra CORS origins. |
 
 Frontend (`frontend/.env.local`, optional):
 
@@ -113,7 +124,7 @@ Create the database tables and seed the demo accounts:
 python -m app.seed_users
 ```
 
-This creates `backend/essay_scoring.db` (SQLite) and the two demo accounts above.
+This creates the local SQLite schema, the two demo accounts, and a demo class named by `DEMO_CLASS_NAME`. Existing unassigned exams are associated with that demo class so demo students can see them. The class invite code is printed and can also be viewed from the teacher's Manage Classes page.
 
 Start the API server:
 
@@ -135,7 +146,7 @@ The app runs at `http://localhost:3000` and talks to the backend at `http://loca
 
 ### 3. Log in
 
-Open `http://localhost:3000/login` and sign in with the demo teacher or student credentials you set in `backend/.env`. Teachers land on `/teacher` (manage exams, review protests); students land on `/student` (take exams, view history).
+Open `http://localhost:3000/login` and sign in with the demo teacher or student credentials you set in `backend/.env`. Teachers land on `/teacher`; students land on `/student`. Students can also create an account at `/signup` using the invitation code from their teacher's class.
 
 ## API docs
 
@@ -150,12 +161,25 @@ pytest
 
 ## Deployment
 
-This repo is set up for local development only; there's no Dockerfile or platform config yet. Before deploying, address:
+### Migrating the database before deployment
 
-- **CORS** — `backend/app/main.py` hardcodes `allow_origins` to `localhost:3000`/`127.0.0.1:3000`. Make it read the allowed origin(s) from an environment variable for the deployed frontend URL.
-- **Database** — `backend/app/database.py` hardcodes a local SQLite file path. Most hosting platforms have an ephemeral filesystem, so data would be lost on redeploy/restart; point `SQLALCHEMY_DATABASE_URL` at a persistent database (e.g. managed Postgres) via an environment variable for production.
-- **Secrets** — set `GEMINI_API_KEY`, `APP_SECRET_KEY`, and `APP_COOKIE_SECURE=true` as environment variables on the host; never commit `.env`.
-- **Build** — frontend: `npm run build && npm start` (or deploy to Vercel); backend: run with a production ASGI setup, e.g. `uvicorn app.main:app --host 0.0.0.0 --port 8000` behind a reverse proxy, or `gunicorn -k uvicorn.workers.UvicornWorker app.main:app`.
+For a public competition deployment, use managed PostgreSQL (for example, a Neon PostgreSQL project) rather than relying on the local SQLite file. SQLite remains the default for local development; setting `DATABASE_URL` switches SQLAlchemy to PostgreSQL using the psycopg 3 driver. A more detailed Indonesian guide is available in [`docs/PANDUAN_DEPLOY_DAN_MIGRASI.md`](docs/PANDUAN_DEPLOY_DAN_MIGRASI.md).
+
+1. Create a PostgreSQL database and copy its connection URL. Keep the URL private.
+2. Stop the local backend before copying data. From `backend`, set the target URL for this terminal only and run the one-time migration command. PowerShell example:
+
+   ```powershell
+   $env:DATABASE_URL="postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require"
+   python -m app.migrate_sqlite_to_postgres --source .\essay_scoring.db
+   ```
+
+   The app normalizes `postgresql://` to the psycopg 3 driver. The migration creates missing tables and copies rows from SQLite into an **empty** PostgreSQL database, preserving IDs and shared columns, then resets generated ID sequences. It refuses to import into a database that already contains rows and never changes the SQLite source. Review the row counts printed at the end.
+3. With the same `DATABASE_URL` environment variable set, run `python -m app.seed_users` to ensure the demo teacher/student and demo class exist in PostgreSQL. If the users already exist, their passwords are not reset by seeding.
+4. Configure the same `DATABASE_URL` as an environment variable in the production backend service. Also set `GEMINI_API_KEY`, a long random `APP_SECRET_KEY`, and `APP_COOKIE_SECURE=true`. For split frontend/backend hosting, set `CORS_ORIGINS` to the exact frontend origin. Never commit `.env` or publish database/API secrets.
+5. The included root `vercel.json` routes `/api/...` to FastAPI and other paths to Next.js through Vercel Services. Leave `NEXT_PUBLIC_API_URL` unset for this same-origin setup. Services is currently in Beta; if unavailable for the account or deployment, host the frontend and backend separately. For a separate API domain, set `NEXT_PUBLIC_API_URL` to that API URL and configure `CORS_ORIGINS` accordingly.
+6. After deployment, test sign in, student registration with a class code, creating a class and exam, submitting an essay, viewing score/history, and reviewing a protest. Confirm data persists after redeploy/restart. Do not consider deployment ready until these checks pass.
+
+`Base.metadata.create_all()` creates missing tables but is not a general schema migration system. The migration script above is for the initial SQLite-to-empty-PostgreSQL copy; after the app has live production data, use an explicit schema migration plan rather than rerunning the initial-copy script.
 
 ## Troubleshooting
 

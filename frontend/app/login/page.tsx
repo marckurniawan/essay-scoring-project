@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { login } from "@/lib/api";
@@ -38,7 +39,7 @@ export default function LoginPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Login gagal. Periksa koneksi dan coba kembali.",
+          : "Gagal masuk. Periksa koneksi lalu coba kembali.",
       );
     } finally {
       setSubmitting(false);
@@ -67,21 +68,21 @@ export default function LoginPage() {
 
         <div className="relative">
           <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-200">
-            AI-Powered Scoring
+            Penilaian Berbantuan AI
           </span>
 
           <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight">
-            Less Grading
+            Lebih Sedikit Mengoreksi
             <br />
             <span className="relative inline-block">
-              More Teaching 
+              Lebih Banyak Mengajar
               <Underline className="absolute -bottom-1 left-0 text-amber-300" />
             </span>
           </h1>
 
           <p className="mt-5 max-w-sm text-sm leading-6 text-sky-100">
-            Guru membuat ujian dan rubrik, siswa mengerjakan, dan AI
-            membantu memberi skor serta feedback secara konsisten.
+            Guru menyusun ujian dan rubrik. Siswa mengerjakan, lalu AI membantu
+            memberikan nilai dan umpan balik secara konsisten.
           </p>
         </div>
 
@@ -100,12 +101,11 @@ export default function LoginPage() {
             <Badge>Selamat datang</Badge>
 
             <h2 className="mt-3 text-3xl font-extrabold tracking-tight">
-              Login ke akunmu
+              Masuk ke akunmu
             </h2>
 
             <p className="mt-2 leading-6 text-slate-600">
-              Kelola penilaian essay atau lihat hasil ujian dan feedback
-              kamu.
+              Kelola penilaian esai atau lihat hasil ujian dan umpan balikmu.
             </p>
           </div>
 
@@ -139,7 +139,7 @@ export default function LoginPage() {
                 required
                 maxLength={320}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
-                placeholder="you@example.com"
+                placeholder="nama@contoh.com"
               />
             </div>
 
@@ -148,7 +148,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="mb-2 block text-sm font-semibold"
               >
-                Password
+                Kata sandi
               </label>
 
               <input
@@ -159,7 +159,7 @@ export default function LoginPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 required
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
-                placeholder="Masukkan password"
+                placeholder="Masukkan kata sandi"
               />
             </div>
 
@@ -168,11 +168,17 @@ export default function LoginPage() {
               disabled={submitting}
               className={buttonClass("primary", "w-full py-3")}
             >
-              {submitting ? "Memverifikasi..." : "Login"}
+              {submitting ? "Memeriksa akun..." : "Masuk"}
             </button>
 
+            <p className="text-center text-sm text-slate-600">
+              Belum punya akun?{" "}
+              <Link href="/signup" className="font-semibold text-sky-700 underline-offset-4 hover:underline">
+                Daftar sebagai siswa
+              </Link>
+            </p>
             <p className="text-xs leading-5 text-slate-500">
-              Akses yang tersedia ditentukan oleh role akun kamu.
+              Hak akses ditentukan otomatis berdasarkan akunmu.
             </p>
           </form>
         </div>

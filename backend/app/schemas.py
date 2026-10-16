@@ -1,8 +1,10 @@
 from datetime import datetime
+import re
 from typing import Literal
 
 from pydantic import (
     BaseModel,
+    field_validator,
     ConfigDict,
     Field,
     field_serializer,
@@ -68,6 +70,8 @@ class ExamQuestionResponse(BaseModel):
 class ExamCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     duration_minutes: int = Field(default=30, ge=1, le=240)
+    # Optional for compatibility with existing exams and clients.
+    class_id: int | None = Field(default=None, gt=0)
     questions: list[ExamQuestionCreate] | None = None
 
     # Legacy format: retained for older frontend requests and tests.
@@ -118,6 +122,8 @@ class ExamResponse(BaseModel):
 
     id: int
     title: str
+    class_id: int | None = None
+    class_ids: list[int] = Field(default_factory=list)
     question: str
     duration_minutes: int
     created_at: datetime | None
@@ -220,6 +226,45 @@ class LoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=1, max_length=1024)
 
+    @field_validator("email")
+    @classmethod
+    def normalize_login_email(cls, value: str) -> str:
+        value = value.strip().lower()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
+            raise ValueError("Masukkan alamat email yang valid.")
+        return value
+
+
+class StudentSignupRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=12, max_length=1024)
+    class_code: str = Field(min_length=8, max_length=12)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if len(value) < 2:
+            raise ValueError("Nama minimal 2 karakter.")
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def normalize_signup_email(cls, value: str) -> str:
+        value = value.strip().lower()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
+            raise ValueError("Masukkan alamat email yang valid.")
+        return value
+
+    @field_validator("class_code")
+    @classmethod
+    def normalize_class_code(cls, value: str) -> str:
+        value = value.strip().upper()
+        if not re.fullmatch(r"[A-HJ-NP-Z2-9]{8}", value):
+            raise ValueError("Kode kelas harus terdiri dari 8 karakter yang valid.")
+        return value
+
 
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -233,3 +278,56 @@ class UserResponse(BaseModel):
     @field_serializer("created_at")
     def serialize_created_at(self, value: datetime | None) -> str | None:
         return to_utc_iso(value)
+
+
+class ClassCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Nama kelas wajib diisi.")
+        return value
+
+
+class ClassStudentSummary(BaseModel):
+    id: int
+    name: str
+    email: str
+    completed_exams: int
+    average_score: float | None
+
+
+class ClassExamSummary(BaseModel):
+    id: int
+    title: str
+    duration_minutes: int
+    created_at: datetime | None
+    completed_students: int
+    average_score: float | None
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime | None) -> str | None:
+        return to_utc_iso(value)
+
+
+class ClassResponse(BaseModel):
+    id: int
+    name: str
+    invite_code: str
+    teacher_id: int
+    created_at: datetime | None
+    student_count: int
+    exam_count: int
+    average_score: float | None
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime | None) -> str | None:
+        return to_utc_iso(value)
+
+
+class ClassDetailResponse(ClassResponse):
+    students: list[ClassStudentSummary] = Field(default_factory=list)
+    exams: list[ClassExamSummary] = Field(default_factory=list)

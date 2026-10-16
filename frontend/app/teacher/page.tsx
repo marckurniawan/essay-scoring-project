@@ -10,14 +10,17 @@ import RoleGuard from "@/components/role-guard";
 import {
   getCurrentUser,
   getScoreProtests,
+  listClasses,
   listExams,
   type AuthenticatedUser,
+  type SchoolClass,
 } from "@/lib/api";
 
 export default function TeacherHomePage() {
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [examCount, setExamCount] = useState<number | null>(null);
   const [pendingProtests, setPendingProtests] = useState<number | null>(null);
+  const [classrooms, setClassrooms] = useState<SchoolClass[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +34,12 @@ export default function TeacherHomePage() {
     listExams()
       .then((exams) => {
         if (!cancelled) setExamCount(exams.length);
+      })
+      .catch(() => {});
+
+    listClasses()
+      .then((data) => {
+        if (!cancelled) setClassrooms(data);
       })
       .catch(() => {});
 
@@ -61,7 +70,18 @@ export default function TeacherHomePage() {
             description="Kelola ujian, pantau hasil penilaian AI, dan tinjau protes nilai dari satu tempat."
           />
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Link
+              href="/teacher/classes"
+              className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-lg"
+            >
+              <p className="text-sm font-medium text-slate-500">Kelas yang dikelola</p>
+              <p className="mt-2 text-4xl font-extrabold text-slate-900">{classrooms.length}</p>
+              <p className="mt-3 text-sm font-medium text-slate-600 group-hover:text-sky-700">
+                {classrooms.reduce((total, classroom) => total + classroom.student_count, 0)} siswa · Buka pengelolaan kelas →
+              </p>
+            </Link>
+
             <Link
               href="/teacher/exams"
               className="group relative overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-r from-sky-700 to-teal-500 p-6 text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"

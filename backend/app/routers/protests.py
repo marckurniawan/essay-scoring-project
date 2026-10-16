@@ -2,17 +2,19 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
+from app.class_access import ensure_exam_access_or_404
 from app.database import get_db
 from app.datetime_utils import to_utc_iso
-from app.models import Criterion, Exam, ScoreProtest, Submission, User
+from app.models import Criterion, Exam, SchoolClass, ScoreProtest, Submission, User
 from app.security import require_role
 
 
-router = APIRouter(prefix="/api", tags=["score protests"])
+router = APIRouter(prefix="/api", tags=["Protes nilai"])
 
 
 class ScoreProtestCreate(BaseModel):
@@ -39,6 +41,12 @@ class ScoreProtestResponse(BaseModel):
     reviewed_by: int | None
     created_at: datetime | None
     reviewed_at: datetime | None
+    student_name: str | None = None
+    student_email: str | None = None
+    exam_id: int | None = None
+    exam_title: str | None = None
+    class_id: int | None = None
+    class_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -65,7 +73,7 @@ def create_score_protest(
     if len(reason) < 10:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Reason must contain at least 10 non-whitespace characters.",
+            detail="Alasan harus berisi minimal 10 karakter yang bukan spasi.",
         )
 
     submission = (
@@ -80,13 +88,13 @@ def create_score_protest(
     if submission is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Submission not found.",
+            detail="Pengerjaan tidak ditemukan.",
         )
 
     if submission.final_score is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This submission has not been graded yet.",
+            detail="Pengerjaan ini belum memiliki nilai akhir.",
         )
 
     if payload.criterion_id is not None:
@@ -102,7 +110,7 @@ def create_score_protest(
         if criterion is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Criterion does not belong to this exam.",
+                detail="Kriteria tersebut bukan bagian dari ujian ini.",
             )
 
     existing_protest = (
@@ -114,7 +122,7 @@ def create_score_protest(
     if existing_protest is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A protest already exists for this submission.",
+            detail="Protes nilai untuk pengerjaan ini sudah diajukan.",
         )
 
     protest = ScoreProtest(
@@ -135,10 +143,10 @@ def create_score_protest(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A protest already exists for this submission.",
+            detail="Protes nilai untuk pengerjaan ini sudah diajukan.",
         )
 
-    return protest
+    return _protest_response(protest, current_user)
 
 
 @router.get(
@@ -149,11 +157,74 @@ def list_score_protests(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("teacher")),
 ):
-    return (
+    protests = (
         db.query(ScoreProtest)
+        .join(Submission, ScoreProtest.submission_id == Submission.id)
+        .join(Exam, Submission.exam_id == Exam.id)
+        .options(
+            joinedload(ScoreProtest.student),
+            joinedload(ScoreProtest.submission)
+            .joinedload(Submission.exam)
+            .selectinload(Exam.classrooms),
+        )
+        .filter(
+            or_(
+                ~Exam.classrooms.any(),
+                Exam.classrooms.any(SchoolClass.teacher_id == current_user.id),
+            )
+        )
         .order_by(ScoreProtest.created_at.desc())
         .all()
     )
+    return [_protest_response(protest, current_user) for protest in protests]
+
+
+def _protest_response(protest: ScoreProtest, context_user: User) -> dict:
+    exam_classrooms = protest.submission.exam.classrooms
+    if context_user.role == "teacher":
+        classroom = next(
+            (
+                assigned_class
+                for assigned_class in exam_classrooms
+                if assigned_class.teacher_id == context_user.id
+            ),
+            None,
+        )
+    else:
+        student_classroom = protest.student.classroom if protest.student else None
+        classroom = next(
+            (
+                assigned_class
+                for assigned_class in exam_classrooms
+                if student_classroom is not None
+                and assigned_class.id == student_classroom.id
+            ),
+            None,
+        )
+    return {
+        "id": protest.id,
+        "submission_id": protest.submission_id,
+        "student_id": protest.student_id,
+        "criterion_id": protest.criterion_id,
+        "reason": protest.reason,
+        "status": protest.status,
+        "original_score": protest.original_score,
+        "reviewed_score": protest.reviewed_score,
+        "teacher_feedback": protest.teacher_feedback,
+        "reviewed_by": protest.reviewed_by,
+        "created_at": protest.created_at,
+        "reviewed_at": protest.reviewed_at,
+        "student_name": protest.student.name if protest.student else None,
+        "student_email": protest.student.email if protest.student else None,
+        "exam_id": protest.submission.exam_id if protest.submission else None,
+        "exam_title": (
+            protest.submission.exam.title
+            if protest.submission and protest.submission.exam
+            else None
+        ),
+        "class_id": classroom.id if classroom else None,
+        "class_name": classroom.name if classroom else "Belum dikaitkan ke kelas",
+    }
 
 
 @router.patch(
@@ -168,6 +239,12 @@ def review_score_protest(
 ):
     protest = (
         db.query(ScoreProtest)
+        .options(
+            joinedload(ScoreProtest.student),
+            joinedload(ScoreProtest.submission)
+            .joinedload(Submission.exam)
+            .selectinload(Exam.classrooms),
+        )
         .filter(ScoreProtest.id == protest_id)
         .with_for_update()
         .first()
@@ -176,13 +253,15 @@ def review_score_protest(
     if protest is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Protest not found.",
+            detail="Protes nilai tidak ditemukan.",
         )
+
+    ensure_exam_access_or_404(db, current_user, protest.submission.exam)
 
     if protest.status != "pending":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This protest has already been reviewed.",
+            detail="Protes nilai ini sudah ditinjau.",
         )
 
     feedback = payload.teacher_feedback.strip()
@@ -190,14 +269,14 @@ def review_score_protest(
     if len(feedback) < 5:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Feedback must contain at least 5 non-whitespace characters.",
+            detail="Umpan balik harus berisi minimal 5 karakter yang bukan spasi.",
         )
 
     if payload.status == "accepted":
         if payload.reviewed_score is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="A reviewed score is required when accepting a protest.",
+                detail="Nilai hasil tinjauan wajib diisi saat protes diterima.",
             )
 
         submission = (
@@ -209,13 +288,13 @@ def review_score_protest(
         if submission is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Submission not found.",
+                detail="Pengerjaan tidak ditemukan.",
             )
 
         if payload.reviewed_score > 100:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Reviewed score cannot exceed 100.",
+                detail="Nilai hasil tinjauan tidak boleh melebihi 100.",
             )
 
         protest.reviewed_score = payload.reviewed_score
@@ -223,7 +302,7 @@ def review_score_protest(
         if payload.reviewed_score is not None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="A reviewed score must not be provided for a rejected protest.",
+                detail="Nilai hasil tinjauan tidak boleh diisi saat protes ditolak.",
             )
 
         protest.reviewed_score = None
@@ -236,4 +315,4 @@ def review_score_protest(
     db.commit()
     db.refresh(protest)
 
-    return protest
+    return _protest_response(protest, current_user)

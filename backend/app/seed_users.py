@@ -1,12 +1,14 @@
 
 import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
 from pwdlib import PasswordHash
 
-from app.database import SessionLocal
-from app.models import User
+from app import models  # Register all model tables before initialization.
+from app.database import Base, SessionLocal, engine
+from app.models import Exam, SchoolClass, User
 
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
@@ -15,6 +17,7 @@ password_hasher = PasswordHash.recommended()
 
 
 def seed_users():
+    Base.metadata.create_all(bind=engine)
     users = [
         {
             "name": os.getenv("DEMO_TEACHER_NAME", "Demo Teacher"),
@@ -72,6 +75,65 @@ def seed_users():
             )
 
         db.commit()
+
+        teacher = (
+            db.query(User)
+            .filter(User.email == users[0]["email"])
+            .first()
+        )
+        student = (
+            db.query(User)
+            .filter(User.email == users[1]["email"])
+            .first()
+        )
+
+        if teacher is not None:
+            class_name = os.getenv("DEMO_CLASS_NAME", "Kelas Demo EssAI").strip()
+            classroom = (
+                db.query(SchoolClass)
+                .filter(
+                    SchoolClass.teacher_id == teacher.id,
+                    SchoolClass.name == class_name,
+                )
+                .first()
+            )
+            if classroom is None:
+                for _ in range(20):
+                    invite_code = "".join(
+                        secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+                        for _ in range(8)
+                    )
+                    if not db.query(SchoolClass.id).filter(
+                        SchoolClass.invite_code == invite_code
+                    ).first():
+                        break
+                else:
+                    raise RuntimeError("Unable to generate a demo class invite code.")
+
+                classroom = SchoolClass(
+                    name=class_name,
+                    teacher_id=teacher.id,
+                    invite_code=invite_code,
+                )
+                db.add(classroom)
+                db.flush()
+
+            if student is not None and student.role == "student" and student.classroom is None:
+                classroom.students.append(student)
+
+            # Existing sample exams without a class become available to demo
+            # students in this class; newly created exams require class selection.
+            unassigned_exams = (
+                db.query(Exam)
+                .filter(~Exam.classrooms.any())
+                .all()
+            )
+            for exam in unassigned_exams:
+                classroom.exams.append(exam)
+
+            db.commit()
+            print(f"Demo class: {classroom.name} (invite code: {classroom.invite_code})")
+
         print("Demo user seeding completed.")
 
     except Exception:

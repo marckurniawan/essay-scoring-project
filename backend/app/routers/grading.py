@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 
+from app.class_access import ensure_exam_access_or_404
 from app.database import get_db
 from app.models import (
     Criterion,
@@ -36,18 +37,26 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def get_exam_or_404(db: Session, exam_id: int) -> Exam:
+def get_exam_or_404(
+    db: Session,
+    exam_id: int,
+    current_user: User,
+) -> Exam:
     exam = (
         db.query(Exam)
-        .options(joinedload(Exam.questions).joinedload(ExamQuestion.criteria))
+        .options(
+            joinedload(Exam.questions).joinedload(ExamQuestion.criteria),
+            joinedload(Exam.classrooms),
+        )
         .filter(Exam.id == exam_id)
         .first()
     )
     if exam is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exam not found",
+            detail="Ujian tidak ditemukan.",
         )
+    ensure_exam_access_or_404(db, current_user, exam)
     return exam
 
 
@@ -261,7 +270,7 @@ def start_exam_attempt(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("student")),
 ):
-    exam = get_exam_or_404(db, exam_id)
+    exam = get_exam_or_404(db, exam_id, current_user)
     questions = get_ordered_questions(db, exam)
 
     existing_attempt = find_active_attempt(db, exam_id, current_user.id)
@@ -302,7 +311,7 @@ def get_my_exam_attempt(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("student")),
 ):
-    exam = get_exam_or_404(db, exam_id)
+    exam = get_exam_or_404(db, exam_id, current_user)
     questions = get_ordered_questions(db, exam)
     attempt = find_active_attempt(db, exam_id, current_user.id)
 
@@ -329,7 +338,7 @@ def save_question_draft(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("student")),
 ):
-    exam = get_exam_or_404(db, exam_id)
+    exam = get_exam_or_404(db, exam_id, current_user)
     attempt = get_attempt_or_404(
         db, exam_id, submission_id, current_user.id
     )
@@ -387,7 +396,7 @@ def save_submission_draft(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("student")),
 ):
-    exam = get_exam_or_404(db, exam_id)
+    exam = get_exam_or_404(db, exam_id, current_user)
     attempt = get_attempt_or_404(
         db, exam_id, submission_id, current_user.id
     )
@@ -424,7 +433,7 @@ def grade_submission(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("student")),
 ):
-    exam = get_exam_or_404(db, exam_id)
+    exam = get_exam_or_404(db, exam_id, current_user)
     questions = get_ordered_questions(db, exam)
     attempt = find_active_attempt(db, exam_id, current_user.id)
 

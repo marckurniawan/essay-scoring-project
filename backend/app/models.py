@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Table,
     Text,
     UniqueConstraint,
     func,
@@ -13,6 +14,45 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+# A student belongs to one class at a time. The unique student_id constraint
+# enforces that rule without adding columns to the existing users table.
+class_students = Table(
+    "class_students",
+    Base.metadata,
+    Column(
+        "class_id",
+        Integer,
+        ForeignKey("classes.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "student_id",
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    UniqueConstraint("student_id", name="uq_class_students_single_class"),
+)
+
+# An exam may be assigned to one or more classes without duplicating the exam.
+class_exams = Table(
+    "class_exams",
+    Base.metadata,
+    Column(
+        "class_id",
+        Integer,
+        ForeignKey("classes.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "exam_id",
+        Integer,
+        ForeignKey("exams.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class User(Base):
@@ -40,6 +80,48 @@ class User(Base):
         "ScoreProtest",
         back_populates="reviewer",
         foreign_keys="ScoreProtest.reviewed_by",
+    )
+
+    classes = relationship(
+        "SchoolClass",
+        back_populates="teacher",
+        foreign_keys="SchoolClass.teacher_id",
+        cascade="all, delete-orphan",
+    )
+    classroom = relationship(
+        "SchoolClass",
+        secondary=class_students,
+        back_populates="students",
+        uselist=False,
+    )
+
+
+class SchoolClass(Base):
+    __tablename__ = "classes"
+    __table_args__ = (
+        UniqueConstraint("teacher_id", "name", name="uq_class_teacher_name"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(120), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    invite_code = Column(String(12), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    teacher = relationship(
+        "User",
+        back_populates="classes",
+        foreign_keys=[teacher_id],
+    )
+    students = relationship(
+        "User",
+        secondary=class_students,
+        back_populates="classroom",
+    )
+    exams = relationship(
+        "Exam",
+        secondary=class_exams,
+        back_populates="classrooms",
     )
 
 
@@ -74,6 +156,21 @@ class Exam(Base):
         back_populates="exam",
         cascade="all, delete-orphan",
     )
+    classrooms = relationship(
+        "SchoolClass",
+        secondary=class_exams,
+        back_populates="exams",
+    )
+
+    @property
+    def class_id(self) -> int | None:
+        """Return the first assigned class for the current single-class UI."""
+        return self.classrooms[0].id if self.classrooms else None
+
+    @property
+    def class_ids(self) -> list[int]:
+        """Return all assigned class IDs for clients that support multiple classes."""
+        return [classroom.id for classroom in self.classrooms]
 
 
 class ExamQuestion(Base):

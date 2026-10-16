@@ -147,7 +147,7 @@ export default function TeacherScoreProtests() {
 
     if (!teacherFeedback) {
       setError(
-        `Isi feedback untuk protes #${protest.id} terlebih dahulu.`,
+        `Isi umpan balik untuk protes #${protest.id} terlebih dahulu.`,
       );
       setNotice("");
       return;
@@ -367,9 +367,11 @@ export default function TeacherScoreProtests() {
                     </div>
 
                     <h3 className="mt-2 break-words text-sm font-semibold text-slate-900 sm:text-base">
-                      Pengerjaan #{protest.submission_id}
+                      {protest.exam_title ?? `Pengerjaan #${protest.submission_id}`}
                     </h3>
-
+                    <p className="mt-1 text-sm text-slate-600">
+                      {protest.student_name ?? `Siswa #${protest.student_id}`} · {protest.class_name ?? "Kelas belum tersedia"}
+                    </p>
                     <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
                       {protest.reason}
                     </p>
@@ -405,17 +407,30 @@ export default function TeacherScoreProtests() {
 
                     <dl className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-lg bg-slate-50 p-3">
-                        <dt className="text-xs text-slate-500">
-                          ID Siswa
-                        </dt>
+                        <dt className="text-xs text-slate-500">Siswa</dt>
                         <dd className="mt-1 text-sm font-medium text-slate-900">
-                          #{protest.student_id}
+                          {protest.student_name ?? `Siswa #${protest.student_id}`}
+                        </dd>
+                        {protest.student_email && <dd className="mt-1 break-all text-xs text-slate-500">{protest.student_email}</dd>}
+                      </div>
+
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <dt className="text-xs text-slate-500">Kelas</dt>
+                        <dd className="mt-1 text-sm font-medium text-slate-900">
+                          {protest.class_name ?? "Belum dikaitkan ke kelas"}
+                        </dd>
+                      </div>
+
+                      <div className="rounded-lg bg-slate-50 p-3">
+                        <dt className="text-xs text-slate-500">Ujian</dt>
+                        <dd className="mt-1 text-sm font-medium text-slate-900">
+                          {protest.exam_title ?? `Ujian #${protest.exam_id ?? protest.submission_id}`}
                         </dd>
                       </div>
 
                       <div className="rounded-lg bg-slate-50 p-3">
                         <dt className="text-xs text-slate-500">
-                          ID Submission
+                          ID pengumpulan
                         </dt>
                         <dd className="mt-1 text-sm font-medium text-slate-900">
                           #{protest.submission_id}
@@ -488,11 +503,11 @@ export default function TeacherScoreProtests() {
 
                         <div>
                           <p className="text-xs font-medium text-slate-500">
-                            Feedback guru
+                            Umpan balik guru
                           </p>
                           <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
                             {protest.teacher_feedback ||
-                              "Tidak ada feedback."}
+                              "Tidak ada umpan balik."}
                           </p>
                         </div>
 
@@ -517,7 +532,7 @@ export default function TeacherScoreProtests() {
                         </h4>
 
                         <p className="mt-1 text-sm leading-5 text-slate-500">
-                          Berikan feedback dan pilih untuk menerima atau
+                          Berikan umpan balik dan pilih untuk menerima atau
                           menolak permintaan siswa.
                         </p>
                       </div>
@@ -525,14 +540,14 @@ export default function TeacherScoreProtests() {
                       <div className="mt-4 space-y-4">
                         <div>
                           <label
-                            htmlFor={`feedback-${protest.id}`}
+                            htmlFor={`teacher-feedback-${protest.id}`}
                             className="mb-1.5 block text-sm font-medium text-slate-700"
                           >
-                            Feedback guru
+                            Umpan balik guru
                           </label>
 
                           <textarea
-                            id={`feedback-${protest.id}`}
+                            id={`teacher-feedback-${protest.id}`}
                             value={teacherFeedback}
                             onChange={(event) =>
                               updateDraft(
