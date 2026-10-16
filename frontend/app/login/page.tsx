@@ -5,6 +5,10 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { login } from "@/lib/api";
+import Logo from "@/components/Logo";
+import Underline from "@/components/Underline";
+import Badge from "@/components/ui/Badge";
+import { buttonClass } from "@/components/ui/button";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -42,90 +46,137 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10 text-slate-900">
-      <div className="w-full max-w-md">
-        <div className="mb-8">
-          <p className="text-sm font-semibold tracking-wide text-blue-700">
-            ESSAY SCORING
-          </p>
+    <main className="flex min-h-screen bg-white text-slate-900">
+      <section
+        className="relative hidden w-1/2 flex-col justify-between overflow-hidden p-10 text-white lg:flex"
+        style={{
+          background:
+            "linear-gradient(135deg, #bae6fd 0%, #0e7490 45%, #042f2e 100%)",
+        }}
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-20 top-1/3 h-72 w-72 rounded-full bg-orange-400/30 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-24 -left-16 h-72 w-72 rounded-full bg-emerald-900/40 blur-3xl"
+        />
 
-          <h1 className="mt-3 text-3xl font-bold tracking-tight">
-            Welcome back
+        <Logo size={110} />
+
+        <div className="relative">
+          <span className="inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-200">
+            AI-Powered Scoring
+          </span>
+
+          <h1 className="mt-5 text-4xl font-extrabold leading-tight tracking-tight">
+            Less Grading
+            <br />
+            <span className="relative inline-block">
+              More Teaching 
+              <Underline className="absolute -bottom-1 left-0 text-amber-300" />
+            </span>
           </h1>
 
-          <p className="mt-2 leading-6 text-slate-600">
-            Login untuk mengelola penilaian essay atau melihat hasil
-            ujian dan feedback kamu.
+          <p className="mt-5 max-w-sm text-sm leading-6 text-sky-100">
+            Guru membuat ujian dan rubrik, siswa mengerjakan, dan AI
+            membantu memberi skor serta feedback secara konsisten.
           </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
-        >
-          {error && (
-            <div
-              role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-800"
-            >
-              {error}
-            </div>
-          )}
+        <p className="relative text-xs text-teal-200">
+          © 2026 EssAI
+        </p>
+      </section>
 
-          <div>
-            <label
-              htmlFor="email"
-              className="mb-2 block text-sm font-semibold"
-            >
-              Email
-            </label>
-
-            <input
-              id="email"
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-              maxLength={320}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              placeholder="you@example.com"
-            />
+      <section className="flex w-full items-center justify-center px-5 py-10 lg:w-1/2">
+        <div className="w-full max-w-md">
+          <div className="mb-8 lg:hidden">
+            <Logo size={96} />
           </div>
 
-          <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-sm font-semibold"
-            >
-              Password
-            </label>
+          <div className="mb-8">
+            <Badge>Selamat datang</Badge>
 
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-              placeholder="Masukkan password"
-            />
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight">
+              Login ke akunmu
+            </h2>
+
+            <p className="mt-2 leading-6 text-slate-600">
+              Kelola penilaian essay atau lihat hasil ujian dan feedback
+              kamu.
+            </p>
           </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-xl bg-blue-700 px-4 py-3 font-semibold text-white transition hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
           >
-            {submitting ? "Memverifikasi..." : "Login"}
-          </button>
+            {error && (
+              <div
+                role="alert"
+                className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-800"
+              >
+                {error}
+              </div>
+            )}
 
-          <p className="text-xs leading-5 text-slate-500">
-            Akses yang tersedia ditentukan oleh role akun kamu.
-          </p>
-        </form>
-      </div>
+            <div>
+              <label
+                htmlFor="email"
+                className="mb-2 block text-sm font-semibold"
+              >
+                Email
+              </label>
+
+              <input
+                id="email"
+                type="email"
+                autoComplete="username"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
+                maxLength={320}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="password"
+                className="mb-2 block text-sm font-semibold"
+              >
+                Password
+              </label>
+
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100"
+                placeholder="Masukkan password"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className={buttonClass("primary", "w-full py-3")}
+            >
+              {submitting ? "Memverifikasi..." : "Login"}
+            </button>
+
+            <p className="text-xs leading-5 text-slate-500">
+              Akses yang tersedia ditentukan oleh role akun kamu.
+            </p>
+          </form>
+        </div>
+      </section>
     </main>
   );
 }

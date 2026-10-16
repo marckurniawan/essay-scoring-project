@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
+from app.datetime_utils import to_utc_iso
 from app.models import CriterionResult, ScoreProtest, Submission, User
 from app.security import require_role
 
@@ -41,8 +42,8 @@ def serialize_protest(protest: ScoreProtest | None) -> dict | None:
         "reviewed_score": protest.reviewed_score,
         "teacher_feedback": protest.teacher_feedback,
         "reviewed_by": protest.reviewed_by,
-        "created_at": protest.created_at,
-        "reviewed_at": protest.reviewed_at,
+        "created_at": to_utc_iso(protest.created_at),
+        "reviewed_at": to_utc_iso(protest.reviewed_at),
     }
 
 
@@ -121,10 +122,10 @@ def get_my_submissions(
                 "duration_minutes": exam.duration_minutes if exam is not None else None,
                 "student_answer": submission.student_answer,
                 "final_score": submission.final_score,
-                "created_at": submission.created_at,
-                "started_at": submission.started_at,
-                "deadline_at": submission.deadline_at,
-                "submitted_at": submission.submitted_at,
+                "created_at": to_utc_iso(submission.created_at),
+                "started_at": to_utc_iso(submission.started_at),
+                "deadline_at": to_utc_iso(submission.deadline_at),
+                "submitted_at": to_utc_iso(submission.submitted_at),
                 "status": submission.status,
                 "criterion_results": all_criterion_results or legacy_criteria,
                 "question_results": question_results,

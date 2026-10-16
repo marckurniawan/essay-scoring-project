@@ -8,6 +8,8 @@ import {
   type ScoreProtest,
   type ScoreProtestReviewInput,
 } from "@/lib/api";
+import { formatDate } from "@/lib/formatDate";
+import { buttonClass } from "./ui/button";
 
 type ReviewDraft = {
   teacherFeedback: string;
@@ -16,23 +18,8 @@ type ReviewDraft = {
 
 type ReviewDecision = "accepted" | "rejected";
 
-function formatDate(value: string | null): string {
-  if (!value) return "Not available";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Not available";
-  }
-
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 function formatScore(value: number | null): string {
-  if (value === null) return "Not available";
+  if (value === null) return "Tidak tersedia";
 
   return `${Number(value.toFixed(2))}/100`;
 }
@@ -44,18 +31,18 @@ function getStatusStyle(status: ScoreProtest["status"]): string {
     case "accepted":
       return "border-emerald-200 bg-emerald-50 text-emerald-800";
     case "rejected":
-      return "border-rose-200 bg-rose-50 text-rose-800";
+      return "border-red-200 bg-red-50 text-red-800";
   }
 }
 
 function getStatusLabel(status: ScoreProtest["status"]): string {
   switch (status) {
     case "pending":
-      return "Pending";
+      return "Menunggu";
     case "accepted":
-      return "Accepted";
+      return "Diterima";
     case "rejected":
-      return "Rejected";
+      return "Ditolak";
   }
 }
 
@@ -83,7 +70,7 @@ export default function TeacherScoreProtests() {
           setError(
             err instanceof Error
               ? err.message
-              : "Unable to load score protests.",
+              : "Gagal memuat protes nilai.",
           );
         }
       })
@@ -110,7 +97,7 @@ export default function TeacherScoreProtests() {
       setError(
         err instanceof Error
           ? err.message
-          : "Unable to refresh score protests.",
+          : "Gagal memuat ulang protes nilai.",
       );
     } finally {
       setRefreshing(false);
@@ -160,7 +147,7 @@ export default function TeacherScoreProtests() {
 
     if (!teacherFeedback) {
       setError(
-        `Please provide teacher feedback for protest #${protest.id}.`,
+        `Isi feedback untuk protes #${protest.id} terlebih dahulu.`,
       );
       setNotice("");
       return;
@@ -184,7 +171,7 @@ export default function TeacherScoreProtests() {
         reviewedScore > 100
       ) {
         setError(
-          "The reviewed score must be a number between 0 and 100.",
+          "Nilai hasil tinjauan harus berupa angka antara 0 dan 100.",
         );
         setNotice("");
         return;
@@ -221,13 +208,13 @@ export default function TeacherScoreProtests() {
       );
 
       setNotice(
-        `Protest #${protest.id} has been ${decision}.`,
+        `Protes #${protest.id} telah ${decision === "accepted" ? "diterima" : "ditolak"}.`,
       );
     } catch (err: unknown) {
       setError(
         err instanceof Error
           ? err.message
-          : `Unable to review protest #${protest.id}.`,
+          : `Gagal memproses protes #${protest.id}.`,
       );
     } finally {
       setSavingProtestId(null);
@@ -259,10 +246,10 @@ export default function TeacherScoreProtests() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-slate-950">
-            Student score protests
+            Protes nilai siswa
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            Review each request and provide a clear decision.
+            Tinjau setiap permintaan dan berikan keputusan yang jelas.
           </p>
         </div>
 
@@ -270,29 +257,29 @@ export default function TeacherScoreProtests() {
           type="button"
           onClick={() => void refreshProtests()}
           disabled={loading || refreshing}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className={buttonClass("secondary", "px-4 py-2 font-medium")}
         >
-          {refreshing ? "Refreshing..." : "Refresh"}
+          {refreshing ? "Memuat ulang..." : "Muat ulang"}
         </button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Total protests</p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Total protes</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-950">
             {protests.length}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Awaiting review</p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Menunggu tinjauan</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-amber-700">
             {pendingCount}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-500">Resolved</p>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-500">Sudah diselesaikan</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-emerald-700">
             {resolvedCount}
           </p>
@@ -302,7 +289,7 @@ export default function TeacherScoreProtests() {
       {error && (
         <div
           role="alert"
-          className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
         >
           {error}
         </div>
@@ -320,24 +307,25 @@ export default function TeacherScoreProtests() {
       {loading ? (
         <div
           role="status"
-          className="rounded-xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500"
+          className="rounded-2xl border border-slate-200 bg-white px-5 py-12 text-center text-sm text-slate-500"
         >
-          Loading score protests...
+          Memuat protes nilai...
         </div>
       ) : protests.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center">
           <h3 className="font-semibold text-slate-900">
-            No score protests yet
+            Belum ada protes nilai
           </h3>
           <p className="mt-2 text-sm text-slate-500">
-            Student protest requests will appear here.
+            Permintaan protes dari siswa akan muncul di sini.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           <p className="text-xs text-slate-500">
-            Showing {protests.length} protests. Pending requests appear first.
-            Open a protest to view its details and review actions.
+            Menampilkan {protests.length} protes. Permintaan yang menunggu
+            ditampilkan lebih dulu. Buka sebuah protes untuk melihat detail
+            dan meninjaunya.
           </p>
 
           {sortedProtests.map((protest) => {
@@ -362,13 +350,13 @@ export default function TeacherScoreProtests() {
             return (
               <details
                 key={protest.id}
-                className="group overflow-hidden rounded-xl border border-slate-200 bg-white transition"
+                className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 transition hover:bg-slate-50 sm:p-5 [&::-webkit-details-marker]:hidden">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-                        Protest #{protest.id}
+                      <span className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                        Protes #{protest.id}
                       </span>
 
                       <span
@@ -379,7 +367,7 @@ export default function TeacherScoreProtests() {
                     </div>
 
                     <h3 className="mt-2 break-words text-sm font-semibold text-slate-900 sm:text-base">
-                      Submission #{protest.submission_id}
+                      Pengerjaan #{protest.submission_id}
                     </h3>
 
                     <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">
@@ -387,17 +375,17 @@ export default function TeacherScoreProtests() {
                     </p>
 
                     <p className="mt-2 text-xs text-slate-500">
-                      Submitted: {formatDate(protest.created_at)}
+                      Diajukan: {formatDate(protest.created_at)}
                     </p>
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="hidden rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 group-open:hidden sm:inline-flex">
-                      Show details
+                    <span className="hidden rounded-full border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 group-open:hidden sm:inline-flex">
+                      Lihat detail
                     </span>
 
-                    <span className="hidden rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 group-open:inline-flex">
-                      Hide details
+                    <span className="hidden rounded-full border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 group-open:inline-flex">
+                      Sembunyikan detail
                     </span>
 
                     <span
@@ -412,13 +400,13 @@ export default function TeacherScoreProtests() {
                 <div className="space-y-5 border-t border-slate-200 p-4 sm:p-5">
                   <section>
                     <h4 className="text-sm font-semibold text-slate-900">
-                      Protest information
+                      Informasi protes
                     </h4>
 
                     <dl className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-lg bg-slate-50 p-3">
                         <dt className="text-xs text-slate-500">
-                          Student ID
+                          ID Siswa
                         </dt>
                         <dd className="mt-1 text-sm font-medium text-slate-900">
                           #{protest.student_id}
@@ -427,7 +415,7 @@ export default function TeacherScoreProtests() {
 
                       <div className="rounded-lg bg-slate-50 p-3">
                         <dt className="text-xs text-slate-500">
-                          Submission ID
+                          ID Submission
                         </dt>
                         <dd className="mt-1 text-sm font-medium text-slate-900">
                           #{protest.submission_id}
@@ -436,18 +424,18 @@ export default function TeacherScoreProtests() {
 
                       <div className="rounded-lg bg-slate-50 p-3">
                         <dt className="text-xs text-slate-500">
-                          Criterion ID
+                          ID Kriteria
                         </dt>
                         <dd className="mt-1 text-sm font-medium text-slate-900">
                           {protest.criterion_id === null
-                            ? "General score"
+                            ? "Nilai keseluruhan"
                             : `#${protest.criterion_id}`}
                         </dd>
                       </div>
 
                       <div className="rounded-lg bg-slate-50 p-3">
                         <dt className="text-xs text-slate-500">
-                          Submitted at
+                          Diajukan pada
                         </dt>
                         <dd className="mt-1 text-sm font-medium text-slate-900">
                           {formatDate(protest.created_at)}
@@ -456,7 +444,7 @@ export default function TeacherScoreProtests() {
 
                       <div className="rounded-lg bg-slate-50 p-3">
                         <dt className="text-xs text-slate-500">
-                          Original score
+                          Nilai awal
                         </dt>
                         <dd className="mt-1 text-sm font-semibold tabular-nums text-slate-900">
                           {formatScore(protest.original_score)}
@@ -465,7 +453,7 @@ export default function TeacherScoreProtests() {
 
                       <div className="rounded-lg bg-slate-50 p-3">
                         <dt className="text-xs text-slate-500">
-                          Reviewed score
+                          Nilai hasil tinjauan
                         </dt>
                         <dd className="mt-1 text-sm font-semibold tabular-nums text-slate-900">
                           {formatScore(protest.reviewed_score)}
@@ -476,7 +464,7 @@ export default function TeacherScoreProtests() {
 
                   <section>
                     <h4 className="text-sm font-semibold text-slate-900">
-                      Student&apos;s reason
+                      Alasan siswa
                     </h4>
 
                     <div className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
@@ -487,12 +475,12 @@ export default function TeacherScoreProtests() {
                   {isResolved && (
                     <section>
                       <h4 className="text-sm font-semibold text-slate-900">
-                        Review result
+                        Hasil tinjauan
                       </h4>
 
                       <div className="mt-2 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
                         <p className="text-sm text-slate-600">
-                          Decision:{" "}
+                          Keputusan:{" "}
                           <span className="font-semibold text-slate-900">
                             {getStatusLabel(protest.status)}
                           </span>
@@ -500,21 +488,21 @@ export default function TeacherScoreProtests() {
 
                         <div>
                           <p className="text-xs font-medium text-slate-500">
-                            Teacher feedback
+                            Feedback guru
                           </p>
                           <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
                             {protest.teacher_feedback ||
-                              "No feedback provided."}
+                              "Tidak ada feedback."}
                           </p>
                         </div>
 
                         <p className="text-xs text-slate-500">
-                          Reviewed at: {formatDate(protest.reviewed_at)}
+                          Ditinjau pada: {formatDate(protest.reviewed_at)}
                         </p>
 
                         {protest.reviewed_by !== null && (
                           <p className="text-xs text-slate-500">
-                            Reviewed by teacher #{protest.reviewed_by}
+                            Ditinjau oleh guru #{protest.reviewed_by}
                           </p>
                         )}
                       </div>
@@ -525,12 +513,12 @@ export default function TeacherScoreProtests() {
                     <section>
                       <div className="border-t border-slate-200 pt-5">
                         <h4 className="text-sm font-semibold text-slate-900">
-                          Review this protest
+                          Tinjau protes ini
                         </h4>
 
                         <p className="mt-1 text-sm leading-5 text-slate-500">
-                          Provide feedback and choose whether to accept or
-                          reject the student&apos;s request.
+                          Berikan feedback dan pilih untuk menerima atau
+                          menolak permintaan siswa.
                         </p>
                       </div>
 
@@ -540,7 +528,7 @@ export default function TeacherScoreProtests() {
                             htmlFor={`feedback-${protest.id}`}
                             className="mb-1.5 block text-sm font-medium text-slate-700"
                           >
-                            Teacher feedback
+                            Feedback guru
                           </label>
 
                           <textarea
@@ -554,10 +542,10 @@ export default function TeacherScoreProtests() {
                                 protest,
                               )
                             }
-                            placeholder="Explain your decision to the student..."
+                            placeholder="Jelaskan keputusanmu kepada siswa..."
                             rows={4}
                             disabled={savingProtestId !== null}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-600 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50"
                           />
                         </div>
 
@@ -566,7 +554,7 @@ export default function TeacherScoreProtests() {
                             htmlFor={`score-${protest.id}`}
                             className="mb-1.5 block text-sm font-medium text-slate-700"
                           >
-                            Revised score
+                            Nilai revisi
                           </label>
 
                           <input
@@ -585,12 +573,12 @@ export default function TeacherScoreProtests() {
                               )
                             }
                             disabled={savingProtestId !== null}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 sm:max-w-xs"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-600 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50 sm:max-w-xs"
                           />
 
                           <p className="mt-1.5 text-xs leading-5 text-slate-500">
-                            Used when accepting the protest. The score must
-                            be between 0 and 100.
+                            Dipakai saat protes diterima. Nilai harus di
+                            antara 0 dan 100.
                           </p>
                         </div>
 
@@ -601,9 +589,9 @@ export default function TeacherScoreProtests() {
                               void handleReview(protest, "accepted")
                             }
                             disabled={savingProtestId !== null}
-                            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className={buttonClass("success", "px-4 py-2.5")}
                           >
-                            {isSaving ? "Saving..." : "Accept protest"}
+                            {isSaving ? "Menyimpan..." : "Terima protes"}
                           </button>
 
                           <button
@@ -612,9 +600,9 @@ export default function TeacherScoreProtests() {
                               void handleReview(protest, "rejected")
                             }
                             disabled={savingProtestId !== null}
-                            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-rose-300 bg-white px-4 py-2.5 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            className={buttonClass("dangerOutline", "px-4 py-2.5")}
                           >
-                            {isSaving ? "Saving..." : "Reject protest"}
+                            {isSaving ? "Menyimpan..." : "Tolak protes"}
                           </button>
                         </div>
                       </div>

@@ -7,16 +7,9 @@ import {
   type SubmissionHistoryItem,
   type SubmissionHistoryCriterion,
 } from "@/lib/api";
+import { formatDate } from "@/lib/formatDate";
+import { buttonClass } from "./ui/button";
 
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "Tanggal tidak tersedia";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Tanggal tidak tersedia";
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
 
 function formatScore(score: number | null | undefined): string {
   return typeof score === "number" && Number.isFinite(score)
@@ -97,7 +90,7 @@ export default function StudentSubmissionAttempts() {
     if (!query) return submissions;
     return submissions.filter((submission) => {
       const content = [
-        submission.exam_title ?? `Exam #${submission.exam_id}`,
+        submission.exam_title ?? `Ujian #${submission.exam_id}`,
         submission.student_answer,
         ...(submission.question_results ?? []).flatMap((question) => [
           question.question,
@@ -156,7 +149,7 @@ export default function StudentSubmissionAttempts() {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Cari berdasarkan nama ujian, pertanyaan, atau jawaban..."
-            className="min-h-11 w-full border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-blue-700 focus:ring-2 focus:ring-blue-100"
+            className="min-h-11 w-full border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-sky-700 focus:ring-2 focus:ring-sky-100"
           />
         </div>
         <div className="flex items-center text-sm text-slate-500">
@@ -171,14 +164,14 @@ export default function StudentSubmissionAttempts() {
       {loading && <p role="status" className="text-sm text-slate-500">Memuat daftar pengerjaan...</p>}
 
       {!loading && !error && submissions.length === 0 && (
-        <div className="border border-dashed border-slate-300 bg-white p-6">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6">
           <p className="font-medium text-slate-900">Belum ada pengerjaan</p>
           <p className="mt-1 text-sm text-slate-500">Ujian yang kamu mulai atau selesaikan akan muncul di sini.</p>
         </div>
       )}
 
       {!loading && !error && submissions.length > 0 && filteredSubmissions.length === 0 && (
-        <div className="border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
           Tidak ada pengerjaan yang sesuai dengan pencarian.
         </div>
       )}
@@ -199,7 +192,7 @@ export default function StudentSubmissionAttempts() {
                 ? "Selesai dinilai"
                 : "Belum dinilai";
           const submissionStatusClass = submission.status === "in_progress"
-            ? "bg-blue-50 text-blue-800"
+            ? "bg-sky-50 text-sky-800"
             : submission.status === "expired"
               ? "bg-amber-50 text-amber-800"
               : typeof submission.final_score === "number"
@@ -207,12 +200,12 @@ export default function StudentSubmissionAttempts() {
                 : "bg-slate-100 text-slate-700";
 
           return (
-            <details key={submission.id} className="group border border-slate-200 bg-white">
+            <details key={submission.id} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 sm:p-5">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="break-words font-semibold text-slate-950">
-                      {submission.exam_title ?? `Exam #${submission.exam_id}`}
+                      {submission.exam_title ?? `Ujian #${submission.exam_id}`}
                     </h3>
                     <span className={`inline-flex px-2 py-1 text-xs font-medium ${submissionStatusClass}`}>
                       {submissionStatus}
@@ -244,8 +237,8 @@ export default function StudentSubmissionAttempts() {
                       Review: {protest.reviewed_score.toFixed(2)}
                     </p>
                   )}
-                  <span className="mt-2 block text-xs font-semibold text-blue-700 group-open:hidden">Show details +</span>
-                  <span className="mt-2 hidden text-xs font-semibold text-blue-700 group-open:block">Hide details −</span>
+                  <span className="mt-2 block text-xs font-semibold text-sky-700 group-open:hidden">Show details +</span>
+                  <span className="mt-2 hidden text-xs font-semibold text-sky-700 group-open:block">Hide details −</span>
                 </div>
               </summary>
 
@@ -254,7 +247,7 @@ export default function StudentSubmissionAttempts() {
                   <h4 className="text-sm font-semibold text-slate-900">Informasi pengerjaan</h4>
                   <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="bg-slate-50 p-3">
-                      <dt className="text-xs text-slate-500">Exam ID</dt>
+                      <dt className="text-xs text-slate-500">ID Ujian</dt>
                       <dd className="mt-1 text-sm font-medium text-slate-900">{submission.exam_id}</dd>
                     </div>
                     <div className="bg-slate-50 p-3">
@@ -262,7 +255,7 @@ export default function StudentSubmissionAttempts() {
                       <dd className="mt-1 text-sm font-medium text-slate-900">{formatDate(submission.started_at)}</dd>
                     </div>
                     <div className="bg-slate-50 p-3">
-                      <dt className="text-xs text-slate-500">Submit / selesai</dt>
+                      <dt className="text-xs text-slate-500">Dikirim / selesai</dt>
                       <dd className="mt-1 text-sm font-medium text-slate-900">{formatDate(submission.submitted_at ?? submission.created_at)}</dd>
                     </div>
                   </dl>
@@ -276,7 +269,7 @@ export default function StudentSubmissionAttempts() {
                         <article key={question.question_submission_id ?? question.question_id} className="border border-slate-200">
                           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 bg-slate-50 p-4">
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
                                 Soal {index + 1} · Bobot {question.weight}
                               </p>
                               <h5 className="mt-1 whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-900">
@@ -377,14 +370,14 @@ export default function StudentSubmissionAttempts() {
                         required
                         disabled={isSubmitting}
                         placeholder="Tuliskan alasan protes dengan jelas..."
-                        className="w-full border border-slate-300 px-3 py-2 text-sm leading-6 text-slate-800 outline-none focus:border-blue-700 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                        className="w-full border border-slate-300 px-3 py-2 text-sm leading-6 text-slate-800 outline-none focus:border-sky-700 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-50"
                       />
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="text-xs text-slate-500">Minimal 10, maksimal 3000 karakter.</p>
                         <button
                           type="submit"
                           disabled={isSubmitting || reasonsValue.trim().length < 10}
-                          className="min-h-10 bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          className={buttonClass("primary", "px-4 py-2")}
                         >
                           {isSubmitting ? "Mengirim..." : "Ajukan protes"}
                         </button>

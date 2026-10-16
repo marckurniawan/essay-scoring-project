@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Literal
 
 from pydantic import (
@@ -8,6 +8,8 @@ from pydantic import (
     field_serializer,
     model_validator,
 )
+
+from app.datetime_utils import to_utc_iso
 
 
 class CriterionCreate(BaseModel):
@@ -57,6 +59,10 @@ class ExamQuestionResponse(BaseModel):
     position: int
     created_at: datetime | None
     criteria: list[CriterionResponse]
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime | None) -> str | None:
+        return to_utc_iso(value)
 
 
 class ExamCreate(BaseModel):
@@ -118,6 +124,10 @@ class ExamResponse(BaseModel):
     criteria: list[CriterionResponse]
     questions: list[ExamQuestionResponse]
 
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime | None) -> str | None:
+        return to_utc_iso(value)
+
 
 class QuestionAnswerInput(BaseModel):
     question_id: int
@@ -169,13 +179,7 @@ class SubmissionAttemptResponse(BaseModel):
 
     @field_serializer("started_at", "deadline_at")
     def serialize_utc_datetime(self, value: datetime) -> str:
-        if value.tzinfo is None:
-            return f"{value.isoformat()}Z"
-        return (
-            value.astimezone(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
+        return to_utc_iso(value)
 
 
 class GradedCriterionResponse(BaseModel):
@@ -207,6 +211,10 @@ class GradingResponse(BaseModel):
     criterion_results: list[GradedCriterionResponse]
     question_results: list[GradedQuestionResponse] = Field(default_factory=list)
 
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime | None) -> str | None:
+        return to_utc_iso(value)
+
 
 class LoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
@@ -221,3 +229,7 @@ class UserResponse(BaseModel):
     email: str
     role: Literal["teacher", "student"]
     created_at: datetime | None
+
+    @field_serializer("created_at")
+    def serialize_created_at(self, value: datetime | None) -> str | None:
+        return to_utc_iso(value)

@@ -2,11 +2,12 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.datetime_utils import to_utc_iso
 from app.models import Criterion, Exam, ScoreProtest, Submission, User
 from app.security import require_role
 
@@ -39,8 +40,11 @@ class ScoreProtestResponse(BaseModel):
     created_at: datetime | None
     reviewed_at: datetime | None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer("created_at", "reviewed_at")
+    def serialize_datetime(self, value: datetime | None) -> str | None:
+        return to_utc_iso(value)
 
 
 @router.post(

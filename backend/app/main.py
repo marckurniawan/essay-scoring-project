@@ -1,10 +1,8 @@
-from app.routers import auth, exams, grading, history
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import models
 from app.database import Base, engine
-from app.routers import auth, exams, grading
 from app.routers import auth, exams, grading, history, protests
 
 Base.metadata.create_all(bind=engine)

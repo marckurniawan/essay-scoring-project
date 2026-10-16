@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getMySubmissions, type SubmissionHistoryItem } from "@/lib/api";
+import { formatDate } from "@/lib/formatDate";
 
 function formatScore(score: number | null): string {
   return typeof score === "number" && Number.isFinite(score)
@@ -85,7 +86,7 @@ export default function StudentSubmissionSummary() {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Link
           href="/student/attempts"
-          className="group border border-blue-200 bg-white p-4 transition-colors hover:border-blue-500 hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 sm:p-5"
+          className="group rounded-2xl border border-teal-200 bg-white p-4 transition-colors hover:border-sky-500 hover:bg-sky-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-700 sm:p-5"
           aria-label="Lihat semua pengerjaan ujian"
         >
           <div className="flex items-start justify-between gap-2">
@@ -95,10 +96,10 @@ export default function StudentSubmissionSummary() {
           <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-950">
             {loading ? "—" : summary.total}
           </p>
-          <p className="mt-1 text-xs text-blue-700">Lihat semua pengerjaan</p>
+          <p className="mt-1 text-xs text-sky-700">Lihat semua pengerjaan</p>
         </Link>
 
-        <article className="border border-slate-200 bg-white p-4 sm:p-5">
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <p className="text-sm text-slate-500">Rata-rata nilai</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-950">
             {loading ? "—" : formatScore(summary.average)}
@@ -108,7 +109,7 @@ export default function StudentSubmissionSummary() {
           </p>
         </article>
 
-        <article className="border border-slate-200 bg-white p-4 sm:p-5">
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <p className="text-sm text-slate-500">Nilai tertinggi</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-950">
             {loading ? "—" : formatScore(summary.highest)}
@@ -116,7 +117,7 @@ export default function StudentSubmissionSummary() {
           <p className="mt-1 text-xs text-slate-500">Dari ujian yang sudah dinilai</p>
         </article>
 
-        <article className="border border-slate-200 bg-white p-4 sm:p-5">
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
           <p className="text-sm text-slate-500">Protes menunggu</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-950">
             {loading ? "—" : summary.pendingProtests}
@@ -125,13 +126,13 @@ export default function StudentSubmissionSummary() {
         </article>
       </div>
 
-      <section className="border border-slate-200 bg-white p-4 sm:p-5">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold text-slate-950">Pengerjaan terbaru</h3>
             <p className="mt-1 text-sm text-slate-500">Ringkasan singkat dari ujian terakhirmu.</p>
           </div>
-          <Link href="/student/attempts" className="text-sm font-semibold text-blue-700 underline-offset-4 hover:underline">
+          <Link href="/student/attempts" className="text-sm font-semibold text-sky-700 underline-offset-4 hover:underline">
             Lihat semua
           </Link>
         </div>
@@ -146,13 +147,10 @@ export default function StudentSubmissionSummary() {
               <div key={submission.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-slate-900">
-                    {submission.exam_title ?? `Exam #${submission.exam_id}`}
+                    {submission.exam_title ?? `Ujian #${submission.exam_id}`}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {new Intl.DateTimeFormat("id-ID", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(submission.created_at))}
+                    {formatDate(submission.created_at)}
                   </p>
                 </div>
                 <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
