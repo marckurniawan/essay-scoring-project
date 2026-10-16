@@ -82,7 +82,7 @@ export default function LoginPage() {
 
           <p className="mt-5 max-w-sm text-sm leading-6 text-sky-100">
             Guru menyusun ujian dan rubrik. Siswa mengerjakan, lalu AI membantu
-            memberikan nilai dan umpan balik secara konsisten.
+            memberikan nilai dan umpan balik sesuai kriteria.
           </p>
         </div>
 
