@@ -1,16 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import Link from "next/link";
 
 import AppHeader from "@/components/AppHeader";
 import {
   createExam,
+  listClasses,
   listExams,
   updateCriterionWeight,
   updateExamQuestion,
   type Criterion,
   type Exam,
   type ExamQuestion,
+  type SchoolClass,
 } from "@/lib/api";
 import Badge from "@/components/ui/Badge";
 import { buttonClass } from "@/components/ui/button";
@@ -99,6 +102,8 @@ function updateQuestionInExam(
 
 export default function TeacherPage() {
   const [exams, setExams] = useState<Exam[]>([]);
+  const [classrooms, setClassrooms] = useState<SchoolClass[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingExam, setSavingExam] = useState(false);
   const [savingCriterionId, setSavingCriterionId] = useState<number | null>(null);
@@ -165,6 +170,18 @@ export default function TeacherPage() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
+      });
+
+    listClasses()
+      .then((data) => {
+        if (cancelled) return;
+        setClassrooms(data);
+        setSelectedClassId((current) => current || (data[0] ? String(data[0].id) : ""));
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Tidak dapat mengambil data kelas.");
+        }
       });
 
     return () => {
@@ -269,6 +286,10 @@ export default function TeacherPage() {
       setError("Judul ujian harus diisi.");
       return;
     }
+    if (!selectedClassId || !classrooms.some((classroom) => classroom.id === Number(selectedClassId))) {
+      setError("Buat kelas terlebih dahulu atau pilih kelas untuk ujian ini.");
+      return;
+    }
 
     const parsedDuration = Number(durationMinutes);
     if (
@@ -367,6 +388,7 @@ export default function TeacherPage() {
       const created = await createExam({
         title: title.trim(),
         duration_minutes: parsedDuration,
+        class_id: Number(selectedClassId),
         questions: parsedQuestions,
       });
 
@@ -751,7 +773,7 @@ export default function TeacherPage() {
                       onChange={(event) => setTitle(event.target.value)}
                       required
                       maxLength={200}
-                      placeholder="Contoh: Machine Learning Fundamentals"
+                      placeholder="Contoh: Dasar Pembelajaran Mesin"
                       className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none placeholder:text-slate-400 focus:border-sky-700 focus:ring-2 focus:ring-sky-100"
                     />
                   </div>
@@ -770,6 +792,29 @@ export default function TeacherPage() {
                     />
                     <p className="mt-1.5 text-xs text-slate-500">Durasi berlaku untuk keseluruhan ujian.</p>
                   </div>
+                </div>
+
+                <div>
+                  <label htmlFor="exam-class" className="mb-2 block text-sm font-medium text-slate-800">Kelas tujuan</label>
+                  {classrooms.length === 0 ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                      Kamu perlu membuat kelas sebelum menerbitkan ujian baru. {" "}
+                      <Link href="/teacher/classes" className="font-semibold underline underline-offset-4">Buat kelas sekarang</Link>.
+                    </div>
+                  ) : (
+                    <select
+                      id="exam-class"
+                      value={selectedClassId}
+                      onChange={(event) => setSelectedClassId(event.target.value)}
+                      required
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none focus:border-sky-700 focus:ring-2 focus:ring-sky-100"
+                    >
+                      {classrooms.map((classroom) => (
+                        <option key={classroom.id} value={classroom.id}>{classroom.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="mt-1.5 text-xs text-slate-500">Ujian ini hanya tersedia bagi siswa yang tergabung di kelas terpilih.</p>
                 </div>
 
                 <div className="space-y-5">
@@ -908,7 +953,7 @@ export default function TeacherPage() {
                   <p className="max-w-2xl text-xs leading-5 text-slate-500">Kriteria berbobot 0 tetap memberikan feedback. Bobot positif pada soal dan rubrik digunakan untuk menghitung nilai akhir.</p>
                   <button
                     type="submit"
-                    disabled={savingExam}
+                    disabled={savingExam || classrooms.length === 0}
                     className={buttonClass("primary", "min-h-11 px-5 py-2.5")}
                   >
                     {savingExam ? "Membuat ujian…" : "Buat ujian"}

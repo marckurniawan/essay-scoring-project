@@ -1,5 +1,6 @@
 const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:8000")
 ).replace(/\/+$/, "");
 
 export type Criterion = {
@@ -29,6 +30,8 @@ export type Exam = {
   question: string;
   duration_minutes: number;
   created_at: string | null;
+  class_id?: number | null;
+  class_ids?: number[];
   /** Legacy flattened list; new clients should use questions[].criteria. */
   criteria: Criterion[];
   questions: ExamQuestion[];
@@ -50,6 +53,7 @@ export type ExamQuestionInput = {
 export type ExamCreateInput = {
   title: string;
   duration_minutes: number;
+  class_id?: number | null;
   questions: ExamQuestionInput[];
 };
 
@@ -100,9 +104,88 @@ export type AuthenticatedUser = {
   created_at: string | null;
 };
 
+export type SchoolClass = {
+  id: number;
+  name: string;
+  invite_code: string;
+  teacher_id: number;
+  created_at: string | null;
+  student_count: number;
+  exam_count: number;
+  average_score: number | null;
+};
+
+export type SchoolClassStudent = {
+  id: number;
+  name: string;
+  email: string;
+  completed_exams: number;
+  average_score: number | null;
+};
+
+export type SchoolClassExam = {
+  id: number;
+  title: string;
+  duration_minutes: number;
+  created_at: string | null;
+  completed_students: number;
+  average_score: number | null;
+};
+
+export type SchoolClassDetail = SchoolClass & {
+  students: SchoolClassStudent[];
+  exams: SchoolClassExam[];
+};
+
+export type StudentPerformance = {
+  student: {
+    id: number;
+    name: string;
+    email: string;
+    created_at: string | null;
+  };
+  class_id: number;
+  class_name: string;
+  average_score: number | null;
+  completed_exams: number;
+  total_attempts: number;
+  attempts: SubmissionHistoryItem[];
+};
+
+export function listClasses(): Promise<SchoolClass[]> {
+  return request<SchoolClass[]>("/api/classes");
+}
+
+export function createClass(name: string): Promise<SchoolClass> {
+  return request<SchoolClass>("/api/classes", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function getClassDetail(classId: number): Promise<SchoolClassDetail> {
+  return request<SchoolClassDetail>(`/api/classes/${classId}`);
+}
+
+export function getStudentPerformance(
+  classId: number,
+  studentId: number,
+): Promise<StudentPerformance> {
+  return request<StudentPerformance>(
+    `/api/classes/${classId}/students/${studentId}`,
+  );
+}
+
 export type LoginInput = {
   email: string;
   password: string;
+};
+
+export type StudentSignupInput = {
+  name: string;
+  email: string;
+  password: string;
+  class_code: string;
 };
 
 type ApiErrorBody = {
@@ -223,6 +306,15 @@ export function login(
   });
 }
 
+export function registerStudent(
+  payload: StudentSignupInput,
+): Promise<AuthenticatedUser> {
+  return request<AuthenticatedUser>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function getCurrentUser(): Promise<AuthenticatedUser> {
   return request<AuthenticatedUser>("/api/auth/me");
 }
@@ -247,6 +339,12 @@ export type ScoreProtest = {
   reviewed_by: number | null;
   created_at: string | null;
   reviewed_at: string | null;
+  student_name?: string | null;
+  student_email?: string | null;
+  exam_id?: number | null;
+  exam_title?: string | null;
+  class_id?: number | null;
+  class_name?: string | null;
 };
 
 export type ScoreProtestCreateInput = {

@@ -7,3 +7,4 @@ python-dotenv
 pytest
 pyjwt
 pwdlib[argon2]
+psycopg[binary]>=3.2,<4

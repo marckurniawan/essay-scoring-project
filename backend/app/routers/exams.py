@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
+from app.class_access import can_access_exam, ensure_exam_access_or_404
 from app.database import get_db
-from app.models import Criterion, Exam, ExamQuestion, User
+from app.models import Criterion, Exam, ExamQuestion, SchoolClass, User
 from app.schemas import (
     CriterionResponse,
     CriterionUpdate,
@@ -58,8 +59,24 @@ def _create_question(
 def create_exam(
     payload: ExamCreate,
     db: Session = Depends(get_db),
-    _teacher: User = Depends(require_role("teacher")),
+    teacher: User = Depends(require_role("teacher")),
 ):
+    classroom = None
+    if payload.class_id is not None:
+        classroom = (
+            db.query(SchoolClass)
+            .filter(
+                SchoolClass.id == payload.class_id,
+                SchoolClass.teacher_id == teacher.id,
+            )
+            .first()
+        )
+        if classroom is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Kelas tidak ditemukan atau bukan milik akun guru ini.",
+            )
+
     if payload.questions is not None:
         question_definitions = [
             (item.question, item.weight, item.criteria)
@@ -77,6 +94,8 @@ def create_exam(
     )
     db.add(exam)
     db.flush()
+    if classroom is not None:
+        exam.classrooms.append(classroom)
 
     for position, (question_text, question_weight, criterion_items) in enumerate(
         question_definitions
@@ -99,23 +118,35 @@ def create_exam(
 @router.get("", response_model=list[ExamResponse])
 def list_exams(
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    return db.query(Exam).order_by(Exam.id.desc()).all()
+    exams = (
+        db.query(Exam)
+        .options(selectinload(Exam.classrooms))
+        .order_by(Exam.id.desc())
+        .all()
+    )
+    return [exam for exam in exams if can_access_exam(db, current_user, exam)]
 
 
 @router.get("/{exam_id}", response_model=ExamResponse)
 def get_exam(
     exam_id: int,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    exam = (
+        db.query(Exam)
+        .options(selectinload(Exam.classrooms))
+        .filter(Exam.id == exam_id)
+        .first()
+    )
     if exam is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exam not found",
+            detail="Ujian tidak ditemukan.",
         )
+    ensure_exam_access_or_404(db, current_user, exam)
     return exam
 
 
@@ -124,14 +155,20 @@ def update_exam(
     exam_id: int,
     payload: ExamUpdate,
     db: Session = Depends(get_db),
-    _teacher: User = Depends(require_role("teacher")),
+    teacher: User = Depends(require_role("teacher")),
 ):
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    exam = (
+        db.query(Exam)
+        .options(selectinload(Exam.classrooms))
+        .filter(Exam.id == exam_id)
+        .first()
+    )
     if exam is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exam not found",
+            detail="Ujian tidak ditemukan.",
         )
+    ensure_exam_access_or_404(db, teacher, exam)
 
     updates = payload.model_dump(exclude_unset=True)
     if not updates or any(value is None for value in updates.values()):
@@ -166,8 +203,21 @@ def update_exam_question(
     question_id: int,
     payload: ExamQuestionUpdate,
     db: Session = Depends(get_db),
-    _teacher: User = Depends(require_role("teacher")),
+    teacher: User = Depends(require_role("teacher")),
 ):
+    exam = (
+        db.query(Exam)
+        .options(selectinload(Exam.classrooms))
+        .filter(Exam.id == exam_id)
+        .first()
+    )
+    if exam is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ujian tidak ditemukan.",
+        )
+    ensure_exam_access_or_404(db, teacher, exam)
+
     question = (
         db.query(ExamQuestion)
         .filter(
@@ -217,8 +267,21 @@ def update_criterion(
     criterion_id: int,
     payload: CriterionUpdate,
     db: Session = Depends(get_db),
-    _teacher: User = Depends(require_role("teacher")),
+    teacher: User = Depends(require_role("teacher")),
 ):
+    exam = (
+        db.query(Exam)
+        .options(selectinload(Exam.classrooms))
+        .filter(Exam.id == exam_id)
+        .first()
+    )
+    if exam is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ujian tidak ditemukan.",
+        )
+    ensure_exam_access_or_404(db, teacher, exam)
+
     criterion = (
         db.query(Criterion)
         .filter(
@@ -255,14 +318,20 @@ def update_criterion(
 def delete_exam(
     exam_id: int,
     db: Session = Depends(get_db),
-    _teacher: User = Depends(require_role("teacher")),
+    teacher: User = Depends(require_role("teacher")),
 ):
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    exam = (
+        db.query(Exam)
+        .options(selectinload(Exam.classrooms))
+        .filter(Exam.id == exam_id)
+        .first()
+    )
     if exam is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Exam not found",
+            detail="Ujian tidak ditemukan.",
         )
+    ensure_exam_access_or_404(db, teacher, exam)
 
     db.delete(exam)
     db.commit()

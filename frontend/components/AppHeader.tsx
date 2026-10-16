@@ -24,8 +24,9 @@ const NAV_LINKS: Record<
   ],
   teacher: [
     { href: "/teacher", label: "Beranda" },
+    { href: "/teacher/classes", label: "Kelola kelas" },
     { href: "/teacher/exams", label: "Kelola ujian" },
-    { href: "/teacher/protests", label: "Review protes" },
+    { href: "/teacher/protests", label: "Protes nilai" },
   ],
 };
 
