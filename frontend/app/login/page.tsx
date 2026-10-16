@@ -109,6 +109,17 @@ export default function LoginPage() {
             </p>
           </div>
 
+          <div
+            role="note"
+            className="mb-5 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            <span aria-hidden="true">💡</span>
+            <p>
+              Login sebagai <span className="font-semibold">guru</span>? Email &amp; kata sandinya
+              tersedia di pitch deck dan video demonstrasi.
+            </p>
+          </div>
+
           <form
             onSubmit={handleSubmit}
             className="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
