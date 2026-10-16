@@ -121,16 +121,6 @@ def seed_users():
             if student is not None and student.role == "student" and student.classroom is None:
                 classroom.students.append(student)
 
-            # Existing sample exams without a class become available to demo
-            # students in this class; newly created exams require class selection.
-            unassigned_exams = (
-                db.query(Exam)
-                .filter(~Exam.classrooms.any())
-                .all()
-            )
-            for exam in unassigned_exams:
-                classroom.exams.append(exam)
-
             db.commit()
             print(f"Demo class: {classroom.name} (invite code: {classroom.invite_code})")
 
