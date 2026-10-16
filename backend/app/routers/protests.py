@@ -239,14 +239,8 @@ def review_score_protest(
 ):
     protest = (
         db.query(ScoreProtest)
-        .options(
-            joinedload(ScoreProtest.student),
-            joinedload(ScoreProtest.submission)
-            .joinedload(Submission.exam)
-            .selectinload(Exam.classrooms),
-        )
         .filter(ScoreProtest.id == protest_id)
-        .with_for_update()
+        .with_for_update(of=ScoreProtest)
         .first()
     )
 
